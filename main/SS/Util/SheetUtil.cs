@@ -175,16 +175,15 @@ namespace NPOI.SS.Util
             return newRow;
         }
 
-
-        /**
-         * Compute width of a single cell
-         *
-         * @param cell the cell whose width is to be calculated
-         * @param defaultCharWidth the width of a single character
-         * @param formatter formatter used to prepare the text to be measured
-         * @param useMergedCells    whether to use merged cells
-         * @return  the width in pixels
-         */
+     /**
+      * Compute width of a single cell
+      *
+      * @param cell the cell whose width is to be calculated
+      * @param defaultCharWidth the width of a single character
+      * @param formatter formatter used to prepare the text to be measured
+      * @param useMergedCells    whether to use merged cells
+      * @return  the width in pixels
+      */
         public static double GetCellWidth(ICell cell, int defaultCharWidth, DataFormatter formatter, bool useMergedCells)
         {
             ISheet sheet = cell.Sheet;
@@ -210,8 +209,8 @@ namespace NPOI.SS.Util
 
             ICellStyle style = cell.CellStyle;
             CellType cellType = cell.CellType;
-            IFont defaultFont = wb.GetFontAt((short)0);
-            Font windowsFont = IFont2Font(defaultFont);
+            //IFont defaultIFont = wb.GetFontAt((short)0); // appears unnecessary?
+            //Font windowsFont = IFont2Font(defaultFont); // this needs to be disposed
             // for formula cells we compute the cell width for the cached formula result
             if (cellType == CellType.Formula) cellType = cell.CachedFormulaResultType;
 
@@ -221,6 +220,7 @@ namespace NPOI.SS.Util
             //TextLayout layout;
 
             double width = -1;
+            using (Font windowsFont = IFont2Font(font))
             using (Bitmap bmp = new Bitmap(2048, 100))
             using (Graphics g = Graphics.FromImage(bmp))
             {
@@ -234,7 +234,7 @@ namespace NPOI.SS.Util
 
                         //str = new AttributedString(txt);
                         //copyAttributes(font, str, 0, txt.length());
-                        windowsFont = IFont2Font(font);
+                        // moved to using clause
                         if (rt.NumFormattingRuns > 0)
                         {
                             // TODO: support rich text fragments
@@ -244,22 +244,22 @@ namespace NPOI.SS.Util
                         if (style.Rotation != 0)
                         {
                             /*
-                             * Transform the text using a scale so that it's height is increased by a multiple of the leading,
-                             * and then rotate the text before computing the bounds. The scale results in some whitespace around
-                             * the unrotated top and bottom of the text that normally wouldn't be present if unscaled, but
-                             * is added by the standard Excel autosize.
-                             */
+                                * Transform the text using a scale so that it's height is increased by a multiple of the leading,
+                                * and then rotate the text before computing the bounds. The scale results in some whitespace around
+                                * the unrotated top and bottom of the text that normally wouldn't be present if unscaled, but
+                                * is added by the standard Excel autosize.
+                                */
                             //AffineTransform trans = new AffineTransform();
                             //trans.concatenate(AffineTransform.getRotateInstance(style.Rotation*2.0*Math.PI/360.0));
                             //trans.concatenate(
                             //    AffineTransform.getScaleInstance(1, fontHeightMultiple)
                             //    );
-                            double angle = style.Rotation * 2.0 * Math.PI / 360.0;
+                            double angle = style.Rotation*2.0*Math.PI/360.0;
                             SizeF sf = g.MeasureString(txt, windowsFont);
-                            double x1 = Math.Abs(sf.Height * Math.Sin(angle));
-                            double x2 = Math.Abs(sf.Width * Math.Cos(angle));
+                            double x1 = Math.Abs(sf.Height*Math.Sin(angle));
+                            double x2 = Math.Abs(sf.Width*Math.Cos(angle));
                             double w = Math.Round(x1 + x2, 0, MidpointRounding.ToEven);
-                            width = Math.Max(width, (w / colspan / defaultCharWidth) * 2 + cell.CellStyle.Indention);
+                            width = Math.Max(width, (w/colspan/defaultCharWidth)*2 + cell.CellStyle.Indention);
                             //width = Math.Max(width,
                             //                 ((layout.getOutline(trans).getBounds().getWidth()/colspan)/defaultCharWidth) +
                             //                 cell.getCellStyle().getIndention());
@@ -269,9 +269,11 @@ namespace NPOI.SS.Util
                             //width = Math.Max(width,
                             //                 ((layout.getBounds().getWidth()/colspan)/defaultCharWidth) +
                             //                 cell.getCellStyle().getIndention());
-                            double w = Math.Round(g.MeasureString(txt, windowsFont).Width, 0, MidpointRounding.ToEven);
-                            width = Math.Max(width, (w / colspan / defaultCharWidth) * 2 + cell.CellStyle.Indention);
+                            double w = Math.Round(g.MeasureString(txt, windowsFont).Width, 0,
+                                                    MidpointRounding.ToEven);
+                            width = Math.Max(width, (w/colspan/defaultCharWidth)*2 + cell.CellStyle.Indention);
                         }
+
                     }
                 }
                 else
@@ -298,7 +300,6 @@ namespace NPOI.SS.Util
                         String txt = sval + defaultChar;
                         //str = new AttributedString(txt);
                         //copyAttributes(font, str, 0, txt.length());
-                        windowsFont = IFont2Font(font);
                         //layout = new TextLayout(str.getIterator(), fontRenderContext);
                         if (style.Rotation != 0)
                         {
@@ -338,6 +339,8 @@ namespace NPOI.SS.Util
         }
 
 
+
+
         // /**
         // * Drawing context to measure text
         // */
@@ -365,8 +368,11 @@ namespace NPOI.SS.Util
             //copyAttributes(defaultFont, str, 0, 1);
             //layout = new TextLayout(str.Iterator, fontRenderContext);
             //int defaultCharWidth = (int)layout.Advance;
-            Font font = IFont2Font(defaultFont);
-            int defaultCharWidth = TextRenderer.MeasureText("" + new String(defaultChar, 1), font).Width;
+            int defaultCharWidth = 0;
+            using (Font font = IFont2Font(defaultFont))
+            {
+                defaultCharWidth = TextRenderer.MeasureText("" + new String(defaultChar, 1), font).Width;
+            }
             //DummyEvaluator dummyEvaluator = new DummyEvaluator();
 
             double width = -1;
@@ -407,8 +413,11 @@ namespace NPOI.SS.Util
             //copyAttributes(defaultFont, str, 0, 1);
             //layout = new TextLayout(str.Iterator, fontRenderContext);
             //int defaultCharWidth = (int)layout.Advance;
-            Font font = IFont2Font(defaultFont);
-            int defaultCharWidth = TextRenderer.MeasureText("" + new String(defaultChar, 1), font).Width;
+            int defaultCharWidth = 0;
+            using (Font font = IFont2Font(defaultFont))
+            {
+                defaultCharWidth = TextRenderer.MeasureText("" + new String(defaultChar, 1), font).Width;
+            }
 
             double width = -1;
             for (int rowIdx = firstRow; rowIdx <= lastRow; ++rowIdx)
